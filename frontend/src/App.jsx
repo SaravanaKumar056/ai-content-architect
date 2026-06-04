@@ -20,7 +20,8 @@ export default function App() {
       // 🚀 REAL BACKEND CONNECTION (Now Active)
       // ------------------------------------------------------
       // This sends the data to your uvicorn server running on port 8000
-      const response = await fetch('http://localhost:8000/generate', {
+      const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${API_URL}/generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: inputText, type: inputType })

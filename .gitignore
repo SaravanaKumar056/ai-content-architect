@@ -3,4 +3,5 @@ venv/
 __pycache__/
 backend/local_model/  <-- CRITICAL: Don't upload the brain!
 .env
-dist/
+dist/backend/local_model/
+backend/local_model/
