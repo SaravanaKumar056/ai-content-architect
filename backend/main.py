@@ -7,9 +7,12 @@ from pydantic import BaseModel
 import google.generativeai as genai
 from transformers import T5Tokenizer, T5ForConditionalGeneration
 
-# --- CONFIGURATION ---
-# Your API Key (I added the one you provided to make this work instantly)
-GEMINI_API_KEY = "AIzaSyDI9JfN2PQOO7kZh7mEHDyV87pA6UjVKAg" 
+
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY") 
+
+if not GEMINI_API_KEY:
+    print("⚠️ WARNING: GEMINI_API_KEY environment variable not set.")
+
 genai.configure(api_key=GEMINI_API_KEY)
 
 app = FastAPI(title="Hybrid AI Content Engine")
@@ -22,7 +25,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- LOAD LOCAL MODEL ---
+#LOAD LOCAL MODEL
 LOCAL_PATH = "./local_model"
 local_model = None
 tokenizer = None
@@ -48,12 +51,12 @@ def generate_content(data: RequestData):
     use_cloud = False
     source = "Local T5-Small"
     result = None
-    
+        
     # Routing Logic
     if len(data.text) > 200 or data.type == "hashtag":
         use_cloud = True
-    
-    # 1. Try Local
+        
+    #try local
     if not use_cloud and local_model:
         try:
             input_text = "caption: " + data.text
@@ -65,19 +68,18 @@ def generate_content(data: RequestData):
             result = tokenizer.decode(outputs[0], skip_special_tokens=True)
         except Exception:
             use_cloud = True
-            
-    # 2. Cloud Fallback
+                
+    #cloud fallback
     if use_cloud or not result:
         source = "Gemini 2.0 Flash"  # Updated Name for Display
         try:
-            # FIX: Using 'gemini-2.0-flash' because it exists in your diagnostic list
             model = genai.GenerativeModel('gemini-2.0-flash')
             prompt = f"Write a creative {data.type} for this context: {data.text}. Keep it engaging."
             response = model.generate_content(prompt)
             result = response.text
         except Exception as e:
             result = f"Cloud Error: {str(e)}"
-            
+                
     return {
         "result": result,
         "source": source,
@@ -86,3 +88,41 @@ def generate_content(data: RequestData):
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+
+# DIAGNOSTIC SCRIPT
+print(f"\n---- DIAGNOSTIC TEST ----")
+print(f"Library Version: {genai.__version__}")
+
+TEST_KEY = os.environ.get("GEMINI_API_KEY") 
+
+try:
+    if not TEST_KEY:
+        raise ValueError("No API Key found in environment variables.")
+        
+    genai.configure(api_key=TEST_KEY)
+    
+    # list available models
+    print("\n... Checking available models for your key ...")
+    models = list(genai.list_models())
+    found_flash = False
+    for m in models:
+        if 'generateContent' in m.supported_generation_methods:
+            print(f" - Found: {m.name}")
+            if "flash" in m.name:
+                found_flash = True
+
+    # try Generation
+    print("\n... Attempting Generation with 'gemini-1.5-flash' ...")
+    model = genai.GenerativeModel('gemini-1.5-flash')
+    response = model.generate_content("Hello, are you working?")
+    print(f"\n SUCCESS! API Response: {response.text}")
+
+except Exception as e:
+    print(f"\n FAILURE. Error Details:")
+    print(e)
+    print("\nTROUBLESHOOTING:")
+    if "404" in str(e):
+        print(" -> 404 means the Model Name is wrong OR the API Key doesn't have access.")
+    if "403" in str(e):
+        print(" -> 403 means the API Key is invalid or billing is disabled.")
